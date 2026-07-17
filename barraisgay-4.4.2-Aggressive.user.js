@@ -5,8 +5,8 @@
 // @namespace    http://tampermonkey.net/
 
 // @version      4.4.4-aggressive
-// @updateURL    https://raw.githubusercontent.com/charlieshrooms/Betfury/main/barraisgay-4.4.2-Aggressive.user.js
-// @downloadURL  https://raw.githubusercontent.com/charlieshrooms/Betfury/main/barraisgay-4.4.2-Aggressive.user.js
+// @updateURL    https://raw.githubusercontent.com/charlieshrooms/Charlieshrooms/main/barraisgay-4.4.2-Aggressive.user.js
+// @downloadURL  https://raw.githubusercontent.com/charlieshrooms/Charlieshrooms/main/barraisgay-4.4.2-Aggressive.user.js
 
 // @description  barraisgay v4.4.2 — adds Dice Auto Vault and easier menu dragging.
 
