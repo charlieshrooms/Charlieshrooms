@@ -4,7 +4,7 @@
 
 // @namespace    http://tampermonkey.net/
 
-// @version      4.4.5-aggressive
+// @version      4.4.6-aggressive
 // @updateURL    https://raw.githubusercontent.com/charlieshrooms/Charlieshrooms/main/barraisgay-4.4.2-Aggressive.user.js
 // @downloadURL  https://raw.githubusercontent.com/charlieshrooms/Charlieshrooms/main/barraisgay-4.4.2-Aggressive.user.js
 
@@ -12371,39 +12371,74 @@ if (!isBuiltIn) {
   // ===== SNIPER LIVE STATUS BADGE =====
   (function setupSniperBadge() {
     function ensureBadge() {
-      let el = document.getElementById('tfm-sniper-badge');
+      var el = document.getElementById('tfm-sniper-badge');
       if (el) return el;
       el = document.createElement('div');
       el.id = 'tfm-sniper-badge';
-      el.style.cssText = 'position:fixed;top:8px;left:50%;transform:translateX(-50%);z-index:2147483646;background:rgba(0,0,0,.85);border:1px solid #0f0;color:#0f0;font:bold 11px monospace;padding:4px 10px;border-radius:8px;pointer-events:none;text-shadow:0 0 6px #0f0;';
-      el.textContent = 'SNIPER: BOOTING';
+      el.style.position = 'fixed';
+      el.style.top = '8px';
+      el.style.left = '50%';
+      el.style.transform = 'translateX(-50%)';
+      el.style.zIndex = '2147483646';
+      el.style.background = 'rgba(0,0,0,0.9)';
+      el.style.border = '2px solid #00ff00';
+      el.style.color = '#00ff00';
+      el.style.font = 'bold 12px monospace';
+      el.style.padding = '6px 12px';
+      el.style.borderRadius = '8px';
+      el.style.pointerEvents = 'none';
+      el.style.textShadow = '0 0 6px #00ff00';
+      el.textContent = 'SNIPER: STARTING';
       (document.body || document.documentElement).appendChild(el);
       return el;
     }
-    setInterval(() => {
+
+    function paint(label, border, color) {
+      var el = ensureBadge();
+      el.textContent = label;
+      el.style.borderColor = border;
+      el.style.color = color;
+    }
+
+    function tick() {
       try {
-        const el = ensureBadge();
-        const s = window.BFHelper?.sniper || window.BFHelper?.v4Sniper;
-        if (!s) { el.textContent = 'SNIPER: NOT LOADED'; el.style.borderColor='#f33'; el.style.color='#f66'; return; }
-        const enabled = !!(window.BFHelper?.settings?.get?.('sniperEnabled') ?? true);
-        const state = s.state || 'UNKNOWN';
-        const processing = !!s.processing;
-        if (!enabled) {
-          el.textContent = 'SNIPER: OFF';
-          el.style.borderColor = '#888'; el.style.color = '#aaa';
-        } else if (processing) {
-          el.textContent = 'SNIPER: CLAIMING…';
-          el.style.borderColor = '#fc0'; el.style.color = '#fc0';
-        } else if (state === 'WATCHING') {
-          el.textContent = 'SNIPER: WATCHING (scanning)';
-          el.style.borderColor = '#0f0'; el.style.color = '#0f0';
-        } else {
-          el.textContent = 'SNIPER: ' + state;
-          el.style.borderColor = '#0af'; el.style.color = '#0af';
+        var s = (window.BFHelper && (window.BFHelper.sniper || window.BFHelper.v4Sniper)) || null;
+        if (!s) {
+          paint('SNIPER: NOT LOADED', '#ff3333', '#ff6666');
+          return;
         }
-      } catch (e) {}
-    }, 500);
+        var enabled = true;
+        try {
+          if (window.BFHelper && window.BFHelper.settings && typeof window.BFHelper.settings.get === 'function') {
+            enabled = !!window.BFHelper.settings.get('sniperEnabled');
+          }
+        } catch (e1) {}
+        if (!enabled) {
+          paint('SNIPER: OFF', '#888888', '#aaaaaa');
+          return;
+        }
+        if (s.processing) {
+          paint('SNIPER: CLAIMING', '#ffcc00', '#ffcc00');
+          return;
+        }
+        var state = s.state || 'UNKNOWN';
+        if (state === 'WATCHING') {
+          paint('SNIPER: WATCHING', '#00ff00', '#00ff00');
+        } else if (state === 'WARMING_UP' || state === 'BOOTING') {
+          paint('SNIPER: WARMING UP', '#00aaff', '#00aaff');
+        } else {
+          paint('SNIPER: ' + state, '#00aaff', '#00aaff');
+        }
+      } catch (e) {
+        paint('SNIPER: ERROR', '#ff3333', '#ff6666');
+      }
+    }
+
+    // show immediately even before body is fully ready
+    setTimeout(tick, 200);
+    setInterval(tick, 500);
   })();
+
 
 
   core.v4Sniper =
@@ -34519,7 +34554,7 @@ if (!isBuiltIn) {
     Disposables
   } = core;
 
-  const FINAL_VERSION = '4.4.5-aggressive';
+  const FINAL_VERSION = '4.4.6-aggressive';
 
   const BUILD_NAME =
     'barraisgay v4.4.1';
