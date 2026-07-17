@@ -4,7 +4,7 @@
 
 // @namespace    http://tampermonkey.net/
 
-// @version      4.4.6-aggressive
+// @version      4.4.7-aggressive
 // @updateURL    https://raw.githubusercontent.com/charlieshrooms/Charlieshrooms/main/barraisgay-4.4.2-Aggressive.user.js
 // @downloadURL  https://raw.githubusercontent.com/charlieshrooms/Charlieshrooms/main/barraisgay-4.4.2-Aggressive.user.js
 
@@ -10008,13 +10008,6 @@ if (!isBuiltIn) {
 
       detectionMethod =
         'keyword-text';
-    } else if (
-      (text === 'get' || text === 'claim') &&
-      isRedButton(element)
-    ) {
-      // lone Get/Claim on a red/pink button
-      score += 500;
-      detectionMethod = 'short-red';
     } else {
       return null;
     }
@@ -10087,15 +10080,12 @@ if (!isBuiltIn) {
           '[role="button"]',
           'div[role="button"]',
           'a[role="button"]',
+          'a[class*="btn"]',
+          'div[class*="btn"]',
+          'div[class*="button"]',
+          'span[class*="btn"]',
           'input[type="button"]',
-          'input[type="submit"]',
-          'div',
-          'span',
-          'a',
-          '[class*="btn"]',
-          '[class*="button"]',
-          '[class*="claim"]',
-          '[class*="drop"]'
+          'input[type="submit"]'
         ].join(',')
       );
 
@@ -11694,10 +11684,12 @@ if (!isBuiltIn) {
         detection
           .findBestCoindropButton();
 
-      if (!match) {
+      // Ignore weak matches (need real Get Coindrop text)
+      if (!match || match.score < 650) {
         if (
           this.state !==
-          'WATCHING'
+          'WATCHING' &&
+          !this.processing
         ) {
           this.transition(
             'WATCHING'
@@ -12137,7 +12129,7 @@ if (!isBuiltIn) {
         this.cycleStartedAt;
 
       if (
-        elapsed < 10000
+        elapsed < 3500
       ) {
         return;
       }
@@ -12409,26 +12401,41 @@ if (!isBuiltIn) {
         }
         var enabled = true;
         try {
-          if (window.BFHelper && window.BFHelper.settings && typeof window.BFHelper.settings.get === 'function') {
-            enabled = !!window.BFHelper.settings.get('sniperEnabled');
+          if (typeof settings !== 'undefined' && settings && typeof settings.get === 'function') {
+            enabled = !!settings.get('sniperEnabled');
           }
         } catch (e1) {}
-        if (!enabled) {
+        var state = s.state || 'UNKNOWN';
+        if (!enabled || state === 'DISABLED') {
           paint('SNIPER: OFF', '#888888', '#aaaaaa');
           return;
         }
-        if (s.processing) {
-          paint('SNIPER: CLAIMING', '#ffcc00', '#ffcc00');
-          return;
-        }
-        var state = s.state || 'UNKNOWN';
         if (state === 'WATCHING') {
           paint('SNIPER: WATCHING', '#00ff00', '#00ff00');
-        } else if (state === 'WARMING_UP' || state === 'BOOTING') {
-          paint('SNIPER: WARMING UP', '#00aaff', '#00aaff');
-        } else {
-          paint('SNIPER: ' + state, '#00aaff', '#00aaff');
+          return;
         }
+        if (state === 'DROP_FOUND' || state === 'WAITING_TO_CLAIM') {
+          paint('SNIPER: FOUND DROP', '#ffcc00', '#ffcc00');
+          return;
+        }
+        if (state === 'CLAIMING' || state === 'RETRYING') {
+          paint('SNIPER: CLICKING', '#ffcc00', '#ffcc00');
+          return;
+        }
+        if (state === 'VERIFYING') {
+          paint('SNIPER: VERIFYING', '#ffaa00', '#ffaa00');
+          return;
+        }
+        if (state === 'WARMING_UP' || state === 'BOOTING') {
+          paint('SNIPER: WARMING UP', '#00aaff', '#00aaff');
+          return;
+        }
+        // stuck protection display
+        if (s.processing) {
+          paint('SNIPER: BUSY (' + state + ')', '#ff8800', '#ff8800');
+          return;
+        }
+        paint('SNIPER: ' + state, '#00aaff', '#00aaff');
       } catch (e) {
         paint('SNIPER: ERROR', '#ff3333', '#ff6666');
       }
@@ -34554,7 +34561,7 @@ if (!isBuiltIn) {
     Disposables
   } = core;
 
-  const FINAL_VERSION = '4.4.6-aggressive';
+  const FINAL_VERSION = '4.4.7-aggressive';
 
   const BUILD_NAME =
     'barraisgay v4.4.1';
