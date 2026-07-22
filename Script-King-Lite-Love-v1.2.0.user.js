@@ -19,6 +19,7 @@
 // @connect      identitytoolkit.googleapis.com
 // @connect      securetoken.googleapis.com
 // @connect      distance-5baec-default-rtdb.firebaseio.com
+// @connect      translate.googleapis.com
 // @run-at       document-idle
 // @noframes
 // ==/UserScript==
@@ -684,4 +685,133 @@
   }
 
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init, { once:true }); else init();
+})();
+
+// =========================================================
+// CHAT AUTO-TRANSLATOR  (Spanish → English, auto-detect)
+// Types Spanish, sends English — fully automated.
+// =========================================================
+(function initChatTranslator() {
+  'use strict';
+
+  const DEBOUNCE_MS = 700;   // wait this long after last keystroke
+  const MIN_CHARS   = 2;     // don't translate single characters
+  const STORAGE_KEY = 'skllChatTranslateEnabled';
+  const BADGE_ID    = 'skll-translate-badge';
+
+  // Persistent on/off toggle – defaults to enabled.
+  let enabled = true;
+  try { enabled = GM_getValue(STORAGE_KEY, true); } catch {}
+
+  // BetFury chat + love compose selectors.
+  const CHAT_SELECTORS = [
+    '#skll-love-compose',
+    'textarea[placeholder*="message" i]',
+    'input[placeholder*="message" i]',
+    '[contenteditable="true"]:not([readonly])',
+    'div[role="textbox"]',
+  ];
+
+  function findChatInput() {
+    for (const sel of CHAT_SELECTORS) {
+      const el = document.querySelector(sel);
+      if (el && el.offsetParent !== null) return el;
+    }
+    return null;
+  }
+
+  // React-compatible value setter.
+  function setReactValue(el, value) {
+    if (el.isContentEditable) {
+      el.textContent = value;
+    } else {
+      const proto = el.tagName === 'TEXTAREA'
+        ? HTMLTextAreaElement.prototype
+        : HTMLInputElement.prototype;
+      const desc = Object.getOwnPropertyDescriptor(proto, 'value');
+      if (desc && desc.set) {
+        desc.set.call(el, value);
+      } else {
+        el.value = value;
+      }
+    }
+    el.dispatchEvent(new InputEvent('input', { bubbles: true, composed: true, inputType: 'insertText', data: value }));
+    el.dispatchEvent(new Event('change', { bubbles: true }));
+  }
+
+  // Call the free Google Translate endpoint (no API key required).
+  async function translateToEnglish(text) {
+    const url = 'https://translate.googleapis.com/translate_a/single'
+      + '?client=gtx&sl=auto&tl=en&dt=t&q='
+      + encodeURIComponent(text);
+    const res = await fetch(url);
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    const data = await res.json();
+    const detectedLang = data && data[2] ? String(data[2]) : '';
+    if (detectedLang === 'en') return null;  // already English
+    const segments = Array.isArray(data && data[0]) ? data[0] : [];
+    const translated = segments.map(s => (s && s[0]) ? s[0] : '').join('');
+    return translated || null;
+  }
+
+  // Show a brief badge near the bottom-right corner.
+  function showBadge(text) {
+    let badge = document.getElementById(BADGE_ID);
+    if (!badge) {
+      badge = document.createElement('div');
+      badge.id = BADGE_ID;
+      badge.style.cssText = [
+        'position:fixed', 'bottom:76px', 'right:14px', 'z-index:2147483647',
+        'background:rgba(30,215,96,.92)', 'color:#000', 'font-size:12px',
+        'font-weight:700', 'padding:5px 12px', 'border-radius:20px',
+        'pointer-events:none', 'transition:opacity .4s ease',
+        'font-family:sans-serif', 'line-height:1.4',
+      ].join(';');
+      document.body.appendChild(badge);
+    }
+    badge.textContent = text;
+    badge.style.opacity = '1';
+    clearTimeout(badge._t);
+    badge._t = setTimeout(() => { badge.style.opacity = '0'; }, 2600);
+  }
+
+  let debounceTimer = null;
+  let lastInputEl   = null;
+  let translating   = false;
+
+  function onInput(e) {
+    if (!enabled || translating) return;
+    const el  = e.target;
+    const raw = el.isContentEditable ? (el.textContent || '') : (el.value || '');
+    const text = raw.trim();
+    if (text.length < MIN_CHARS) return;
+
+    clearTimeout(debounceTimer);
+    debounceTimer = setTimeout(async () => {
+      try {
+        translating = true;
+        const result = await translateToEnglish(text);
+        if (result && result !== text) {
+          setReactValue(el, result);
+          showBadge('🌐 Translated ✓');
+        }
+      } catch (_err) {
+        // Silently skip — don't interrupt the user.
+      } finally {
+        translating = false;
+      }
+    }, DEBOUNCE_MS);
+  }
+
+  function attachToInput(el) {
+    if (!el || el === lastInputEl) return;
+    if (lastInputEl) lastInputEl.removeEventListener('input', onInput);
+    el.addEventListener('input', onInput);
+    lastInputEl = el;
+  }
+
+  // Watch for the chat panel being mounted (BetFury is a React SPA).
+  const domObserver = new MutationObserver(() => attachToInput(findChatInput()));
+  domObserver.observe(document.body || document.documentElement, { childList: true, subtree: true });
+  attachToInput(findChatInput());
 })();
